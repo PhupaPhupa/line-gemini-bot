@@ -12,16 +12,30 @@ LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
+# ตั้งค่า Gemini AI
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+
+# กำหนดบทบาทและข้อมูลให้ Gemini AI (System Instruction)
+system_instruction = """
+คุณคือผู้ช่วย AI ของโครงการ SMART AWD METHANE ROVER
+หน้าที่ของคุณคือตอบคำถามผู้ใช้เกี่ยวกับระบบตรวจวัดก๊าซมีเทนและสภาพแวดล้อมแปลงนา
+หากผู้ใช้ถามขอลิงก์เว็บ ให้ส่งลิงก์ http://ac54241.assumptiondev.com/methanetast/index.html ให้ผู้ใช้
+ตอบด้วยภาษาไทยที่สุภาพ เป็นกันเอง และสั้นกระชับ
+"""
+
+model = genai.GenerativeModel(
+    model_name='gemini-1.5-flash',
+    system_instruction=system_instruction
+)
 
 configuration = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
+# คีย์เวิร์ดที่ต้องการให้ LINE OA ตอบเอง (ไม่ผ่าน Gemini)
 KEYWORDS = [
-    "FAQ", "faq", "Faq", "คำถามที่พบบ่อย",
-    "Instruction", "instruction", "คู่มือ", "แนะนำการใช้งาน",
-    "About Me", "about me", "เกี่ยวกับเรา", "เกี่ยวกับฉัน",
+    "FAQ", "faq", "คำถามที่พบบ่อย",
+    "Instruction", "instruction", "คู่มือ",
+    "About Me", "about me", "เกี่ยวกับเรา",
     "AWD", "awd"
 ]
 
@@ -39,15 +53,15 @@ def callback():
 def handle_message(event):
     user_text = event.message.text.strip()
 
-    # ตรวจสอบว่าตรงกับ Keyword หรือไม่
+    # ตรวจสอบ Keyword
     user_text_lower = user_text.lower()
     if any(kw.lower() in user_text_lower for kw in KEYWORDS):
-        return  # ปล่อยให้ LINE OA Auto-response ตอบแทน
+        return  # ปล่อยให้ LINE OA ตอบเอง
 
-    # ถ้าไม่ตรงกับ Keyword ส่งให้ Gemini AI ตอบ
+    # ส่งให้ Gemini AI ประมวลผล
     try:
         response = model.generate_content(user_text)
-        ai_reply = response.text
+        ai_reply = response.text.strip()
 
         with ApiClient(configuration) as api_client:
             line_bot_api = MessagingApi(api_client)
@@ -58,7 +72,7 @@ def handle_message(event):
                 )
             )
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Gemini Error: {e}")
 
 if __name__ == "__main__":
     app.run(port=5000)
