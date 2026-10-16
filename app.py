@@ -18,12 +18,11 @@ model = genai.GenerativeModel('gemini-1.5-flash')
 configuration = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-# กำหนด Keywords สำหรับข้าม AI
 KEYWORDS = [
-    "FAQ", "faq", "Faq", "คำถามที่พบบ่อย", "คำถาม",
-    "Instruction", "instruction", "INSTRUCTION", "คู่มือ", "วิธีใช้งาน", "แนะนำการใช้งาน",
-    "About Me", "about me", "About me", "ABOUT ME", "เกี่ยวกับเรา", "เกี่ยวกับฉัน",
-    "AWD", "awd", "Awd"
+    "FAQ", "faq", "Faq", "คำถามที่พบบ่อย",
+    "Instruction", "instruction", "คู่มือ", "แนะนำการใช้งาน",
+    "About Me", "about me", "เกี่ยวกับเรา", "เกี่ยวกับฉัน",
+    "AWD", "awd"
 ]
 
 @app.route("/webhook", methods=['POST'])
@@ -40,23 +39,26 @@ def callback():
 def handle_message(event):
     user_text = event.message.text.strip()
 
-    # ตรวจสอบว่ามี Keyword คำไหนอยู่ในข้อความผู้ใช้หรือไม่ (แปลงเป็นพิมพ์เล็กเพื่อเทียบได้ง่ายขึ้น)
+    # ตรวจสอบว่าตรงกับ Keyword หรือไม่
     user_text_lower = user_text.lower()
     if any(kw.lower() in user_text_lower for kw in KEYWORDS):
-        return  # ถ้าเจอ Keyword ให้หยุดทำงาน เพื่อปล่อยให้ LINE OA Auto-response ตอบแทน
+        return  # ปล่อยให้ LINE OA Auto-response ตอบแทน
 
-    # ถ้าไม่พบ Keyword ใดๆ ให้ Gemini AI ประมวลผลและตอบกลับ
-    response = model.generate_content(user_text)
-    ai_reply = response.text
+    # ถ้าไม่ตรงกับ Keyword ส่งให้ Gemini AI ตอบ
+    try:
+        response = model.generate_content(user_text)
+        ai_reply = response.text
 
-    with ApiClient(configuration) as api_client:
-        line_bot_api = MessagingApi(api_client)
-        line_bot_api.reply_message_with_http_info(
-            ReplyMessageRequest(
-                reply_token=event.reply_token,
-                messages=[TextMessage(text=ai_reply)]
+        with ApiClient(configuration) as api_client:
+            line_bot_api = MessagingApi(api_client)
+            line_bot_api.reply_message_with_http_info(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=ai_reply)]
+                )
             )
-        )
+    except Exception as e:
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
     app.run(port=5000)
