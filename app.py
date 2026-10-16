@@ -18,8 +18,13 @@ model = genai.GenerativeModel('gemini-1.5-flash')
 configuration = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-# รายการ Keywords เดียวกับที่คุณตั้งไว้ใน LINE OA
-KEYWORDS = ["ราคา", "เวลาทำการ", "ติดต่อ", "ที่อยู่"]
+# กำหนด Keywords สำหรับข้าม AI
+KEYWORDS = [
+    "FAQ", "faq", "Faq", "คำถามที่พบบ่อย", "คำถาม",
+    "Instruction", "instruction", "INSTRUCTION", "คู่มือ", "วิธีใช้งาน", "แนะนำการใช้งาน",
+    "About Me", "about me", "About me", "ABOUT ME", "เกี่ยวกับเรา", "เกี่ยวกับฉัน",
+    "AWD", "awd", "Awd"
+]
 
 @app.route("/webhook", methods=['POST'])
 def callback():
@@ -35,12 +40,12 @@ def callback():
 def handle_message(event):
     user_text = event.message.text.strip()
 
-    # เช็กว่าข้อความตรงกับ Keyword ของ LINE หรือไม่
-    # ถ้าตรง ให้ข้ามไป (ปล่อยให้ LINE ตอบเอง)
-    if any(kw in user_text for kw in KEYWORDS):
-        return
+    # ตรวจสอบว่ามี Keyword คำไหนอยู่ในข้อความผู้ใช้หรือไม่ (แปลงเป็นพิมพ์เล็กเพื่อเทียบได้ง่ายขึ้น)
+    user_text_lower = user_text.lower()
+    if any(kw.lower() in user_text_lower for kw in KEYWORDS):
+        return  # ถ้าเจอ Keyword ให้หยุดทำงาน เพื่อปล่อยให้ LINE OA Auto-response ตอบแทน
 
-    # ถ้าไม่ตรงกับ Keyword ใดๆ ให้ส่งไปหา Gemini AI ตอบ
+    # ถ้าไม่พบ Keyword ใดๆ ให้ Gemini AI ประมวลผลและตอบกลับ
     response = model.generate_content(user_text)
     ai_reply = response.text
 
