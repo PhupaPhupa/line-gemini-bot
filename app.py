@@ -8,7 +8,6 @@ import google.generativeai as genai
 
 app = Flask(__name__)
 
-# ดึงค่า Keys จาก Environment Variables บน Server
 LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
@@ -18,6 +17,9 @@ model = genai.GenerativeModel('gemini-1.5-flash')
 
 configuration = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
+
+# รายการ Keywords เดียวกับที่คุณตั้งไว้ใน LINE OA
+KEYWORDS = ["ราคา", "เวลาทำการ", "ติดต่อ", "ที่อยู่"]
 
 @app.route("/webhook", methods=['POST'])
 def callback():
@@ -31,7 +33,14 @@ def callback():
 
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
-    user_text = event.message.text
+    user_text = event.message.text.strip()
+
+    # เช็กว่าข้อความตรงกับ Keyword ของ LINE หรือไม่
+    # ถ้าตรง ให้ข้ามไป (ปล่อยให้ LINE ตอบเอง)
+    if any(kw in user_text for kw in KEYWORDS):
+        return
+
+    # ถ้าไม่ตรงกับ Keyword ใดๆ ให้ส่งไปหา Gemini AI ตอบ
     response = model.generate_content(user_text)
     ai_reply = response.text
 
