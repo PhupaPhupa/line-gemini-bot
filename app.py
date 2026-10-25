@@ -56,7 +56,7 @@ def handle_message(event):
     # ส่งให้ Gemini AI ประมวลผลด้วย SDK ตัวใหม่ พร้อมระบบป้องกันล่ม
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-3.8-flash',  # <--- แก้ไขชื่อโมเดลตรงนี้เป็น gemini-3.8-flash เรียบร้อยแล้ว
             contents=user_text,
             config={
                 'system_instruction': system_instruction
