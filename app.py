@@ -17,7 +17,7 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 # ตั้งชื่อโมเดลผ่าน env ได้ ไม่ต้องแก้โค้ดทุกครั้ง
 # gemini-2.5-flash-lite มักมีโควต้าฟรีสูงสุด ถ้าไม่ชัวร์ให้ลิสต์ดูด้วย client.models.list()
-GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash-lite')
+GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-3.5-flash-lite')
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
