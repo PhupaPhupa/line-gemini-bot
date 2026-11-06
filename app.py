@@ -8,6 +8,7 @@ from linebot.v3.messaging import (
 )
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
 from google import genai
+from google.genai import types
 
 app = Flask(__name__)
 
@@ -36,11 +37,15 @@ KNOWLEDGE = load_knowledge()
 
 system_instruction = f"""
 คุณคือผู้ช่วย AI ของโครงการ SMART AWD METHANE ROVER
-หน้าที่ของคุณคือตอบคำถามผู้ใช้เกี่ยวกับระบบตรวจวัดก๊าซมีเทนและสภาพแวดล้อมแปลงนา
+หน้าที่ของคุณคือตอบคำถามผู้ใช้เกี่ยวกับโครงการ ระบบตรวจวัดก๊าซมีเทน การทำนาข้าว
+การจัดการน้ำแบบ AWD คาร์บอนเครดิต และเรื่องที่เกี่ยวข้อง
 
 กติกาการตอบ:
-- ตอบโดยอิงจาก "ข้อมูลโครงการ" ด้านล่างเป็นหลัก
-- ถ้าคำถามอยู่นอกเหนือข้อมูลที่มี ให้บอกตรงๆ ว่าไม่มีข้อมูลส่วนนี้ ห้ามเดาหรือแต่งตัวเลขขึ้นเอง
+- ถ้าคำถามเกี่ยวกับตัวโครงการ (อุปกรณ์ งบ เป้าหมาย การทำงาน) ให้ตอบจาก "ข้อมูลโครงการ" ด้านล่างเป็นหลัก
+- ถ้าข้อมูลโครงการไม่มีคำตอบ ให้ค้นหาข้อมูลจากอินเทอร์เน็ตด้วยตัวเอง แล้วสรุปเป็นคำตอบ
+- เมื่อตอบจากการค้นเว็บ ให้บอกสั้นๆ ว่า "จากการค้นข้อมูลเพิ่มเติม" และห้ามแต่งตัวเลขหรือข้อมูลขึ้นเอง
+- ถ้าค้นแล้วก็ยังไม่พบข้อมูลที่เชื่อถือได้ ให้บอกตรงๆ ว่าไม่พบ
+- ห้ามเอาข้อมูลจากการค้นเว็บไปปนว่าเป็นข้อมูลของโครงการ ถ้าโครงการไม่ได้ระบุไว้
 - หากผู้ใช้ขอลิงก์เว็บ ให้ส่งลิงก์ Dashboard ในข้อมูลโครงการ
 - ตอบด้วยภาษาไทยที่สุภาพ เป็นกันเอง และสั้นกระชับ (ไม่เกิน 5-6 บรรทัด ยกเว้นผู้ใช้ขอรายละเอียด)
 - ไม่ต้องใช้สัญลักษณ์ markdown เช่น ** หรือ # เพราะ LINE แสดงไม่ได้
@@ -48,6 +53,17 @@ system_instruction = f"""
 ===== ข้อมูลโครงการ =====
 {KNOWLEDGE}
 """
+
+# config แบบเปิดการค้นเว็บ (Google Search grounding)
+CONFIG_WITH_SEARCH = types.GenerateContentConfig(
+    system_instruction=system_instruction,
+    tools=[types.Tool(google_search=types.GoogleSearch())],
+)
+
+# config สำรอง ไม่ค้นเว็บ (ใช้เมื่อค้นเว็บไม่ได้ เช่น โควต้าค้นหาเต็ม)
+CONFIG_NO_SEARCH = types.GenerateContentConfig(
+    system_instruction=system_instruction,
+)
 
 configuration = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
@@ -74,6 +90,28 @@ def reply_text(reply_token, text):
         )
 
 
+def ask_gemini(user_text):
+    """ถามแบบมีค้นเว็บก่อน ถ้าพังให้ลองใหม่แบบไม่ค้นเว็บ"""
+    try:
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=user_text,
+            config=CONFIG_WITH_SEARCH,
+        )
+        text = (response.text or "").strip()
+        if text:
+            return text
+    except Exception as e:
+        print(f"Gemini (with search) Error: {e}")
+
+    response = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=user_text,
+        config=CONFIG_NO_SEARCH,
+    )
+    return (response.text or "").strip()
+
+
 @app.route("/webhook", methods=['POST'])
 def callback():
     signature = request.headers.get('X-Line-Signature', '')
@@ -94,12 +132,7 @@ def handle_message(event):
         return
 
     try:
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=user_text,
-            config={'system_instruction': system_instruction}
-        )
-        ai_reply = (response.text or "").strip() or FALLBACK_MSG
+        ai_reply = ask_gemini(user_text) or FALLBACK_MSG
         reply_text(event.reply_token, ai_reply)
 
     except Exception as e:
@@ -108,8 +141,3 @@ def handle_message(event):
         try:
             reply_text(event.reply_token, FALLBACK_MSG)
         except Exception as inner_e:
-            print(f"Line Reply Error: {inner_e}")
-
-
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
