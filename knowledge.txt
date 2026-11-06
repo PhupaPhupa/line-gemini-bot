@@ -62,3 +62,5 @@
 
 # ลิงก์
 - เว็บ Dashboard: http://ac54241.assumptiondev.com/methanetast/index.html
+
+หากใน knowledge.txt ไม่มีให้ไปหาข้อมูลจาก Google เองเลย
