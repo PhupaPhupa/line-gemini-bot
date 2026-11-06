@@ -141,3 +141,8 @@ def handle_message(event):
         try:
             reply_text(event.reply_token, FALLBACK_MSG)
         except Exception as inner_e:
+            print(f"Line Reply Error: {inner_e}")
+
+
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
