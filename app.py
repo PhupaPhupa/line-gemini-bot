@@ -16,16 +16,37 @@ LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 # ตั้งชื่อโมเดลผ่าน env ได้ ไม่ต้องแก้โค้ดทุกครั้ง
-# gemini-2.5-flash-lite มักมีโควต้าฟรีสูงสุด ถ้าไม่ชัวร์ให้ลิสต์ดูด้วย client.models.list()
-GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-3.5-flash-lite')
+# ถ้าไม่ชัวร์ว่าชื่อไหนใช้ได้ ให้ลิสต์ดูด้วย client.models.list()
+GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash-lite')
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-system_instruction = """
+
+def load_knowledge():
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'knowledge.txt')
+    try:
+        with open(path, encoding='utf-8') as f:
+            return f.read()
+    except FileNotFoundError:
+        print("ไม่พบไฟล์ knowledge.txt")
+        return ""
+
+
+KNOWLEDGE = load_knowledge()
+
+system_instruction = f"""
 คุณคือผู้ช่วย AI ของโครงการ SMART AWD METHANE ROVER
 หน้าที่ของคุณคือตอบคำถามผู้ใช้เกี่ยวกับระบบตรวจวัดก๊าซมีเทนและสภาพแวดล้อมแปลงนา
-หากผู้ใช้ถามขอลิงก์เว็บ ให้ส่งลิงก์ http://ac54241.assumptiondev.com/methanetast/index.html ให้ผู้ใช้
-ตอบด้วยภาษาไทยที่สุภาพ เป็นกันเอง และสั้นกระชับ
+
+กติกาการตอบ:
+- ตอบโดยอิงจาก "ข้อมูลโครงการ" ด้านล่างเป็นหลัก
+- ถ้าคำถามอยู่นอกเหนือข้อมูลที่มี ให้บอกตรงๆ ว่าไม่มีข้อมูลส่วนนี้ ห้ามเดาหรือแต่งตัวเลขขึ้นเอง
+- หากผู้ใช้ขอลิงก์เว็บ ให้ส่งลิงก์ Dashboard ในข้อมูลโครงการ
+- ตอบด้วยภาษาไทยที่สุภาพ เป็นกันเอง และสั้นกระชับ (ไม่เกิน 5-6 บรรทัด ยกเว้นผู้ใช้ขอรายละเอียด)
+- ไม่ต้องใช้สัญลักษณ์ markdown เช่น ** หรือ # เพราะ LINE แสดงไม่ได้
+
+===== ข้อมูลโครงการ =====
+{KNOWLEDGE}
 """
 
 configuration = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
